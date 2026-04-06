@@ -67,6 +67,9 @@
   @media(max-width:700px){.sidebar{width:60px}.sidebar-logo .brand,.sidebar-logo .tagline,.user-info,.nav-item span:not(.nav-icon),.nav-badge,.nav-section-title{display:none}.main-content{margin-left:60px;padding:16px}}
   @media print{.sidebar,.page-header .header-actions,#toast-container,.sync-indicator,.btn-action{display:none!important}.main-content{margin-left:0;padding:0}#view-reporte{display:block!important}}
 </style>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
 </head>
 <body>
 <div id="loading-screen">
@@ -114,7 +117,8 @@
         <div class="stat-card stat-blue"><div class="stat-icon">📋</div><div class="stat-label">Total Actividades</div><div class="stat-value" id="dash-total-acts">0</div><div class="stat-sub" id="dash-acts-detail">—</div></div>
       </div>
       <div class="budget-section"><div class="budget-header"><span class="budget-title">🎯 Ejecución Presupuesto MKT</span><span style="font-size:13px;color:var(--gray-600)">Aprobado: <strong id="dash-ejecutado-label" style="color:var(--green-dark)">Bs. 0</strong> de <strong id="dash-presupuesto-label" style="color:var(--green-dark)">Bs. 0</strong></span></div><div class="budget-bar-bg"><div class="budget-bar-fill" id="budget-bar" style="width:0%"></div></div><div class="budget-labels"><span>0%</span><span id="budget-pct-label">0.0%</span><span>100%</span></div></div>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px"><div class="card"><div class="card-header"><span class="card-title">Distribución por Canal</span></div><div class="card-body" id="dash-canales" style="padding:16px"></div></div><div class="card"><div class="card-header"><span class="card-title">Últimas Actividades</span></div><div id="dash-recent"></div></div></div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-bottom:20px"><div class="card"><div class="card-header"><span class="card-title">Distribución por Canal</span></div><div class="card-body" id="dash-canales" style="padding:16px"></div></div><div class="card"><div class="card-header"><span class="card-title">Últimas Actividades</span></div><div id="dash-recent"></div></div></div>
+      <div class="card"><div class="card-header"><span class="card-title">📈 Tendencia Mensual — Ejecución Presupuestaria</span><span style="font-size:12px;color:var(--gray-400)">Últimos 3 meses</span></div><div class="card-body" style="padding:20px 24px"><canvas id="trend-chart" height="90"></canvas></div></div>
     </div>
     <!-- ACTIVIDADES -->
     <div id="view-actividades" class="view">
@@ -142,7 +146,7 @@
     </div>
     <!-- REPORTE -->
     <div id="view-reporte" class="view">
-      <div class="page-header"><div><div class="page-title">Reporte <span>Mensual</span></div><div class="page-subtitle">Resumen ejecutivo del Comité de Trade Marketing</div></div><div class="header-actions"><div class="month-nav"><button class="month-btn" onclick="changeMonth(-1)">◀</button><span class="month-current" id="month-display-5">—</span><button class="month-btn" onclick="changeMonth(1)">▶</button></div><button class="btn-action btn-gold" onclick="window.print()">🖨 Imprimir</button></div></div>
+      <div class="page-header"><div><div class="page-title">Reporte <span>Mensual</span></div><div class="page-subtitle">Resumen ejecutivo del Comité de Trade Marketing</div></div><div class="header-actions"><div class="month-nav"><button class="month-btn" onclick="changeMonth(-1)">◀</button><span class="month-current" id="month-display-5">—</span><button class="month-btn" onclick="changeMonth(1)">▶</button></div><button class="btn-action btn-outline" onclick="window.print()">🖨 Imprimir</button><button class="btn-action btn-gold" onclick="exportPDF()">📄 Exportar PDF</button></div></div>
       <div id="reporte-content"></div>
     </div>
   </div>
@@ -154,7 +158,7 @@
 <div id="toast-container"></div>
 <script type="module">
 import{initializeApp}from"https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
-import{getFirestore,collection,doc,setDoc,getDocs,onSnapshot,query,where,deleteDoc,serverTimestamp}from"https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+import{getFirestore,collection,doc,setDoc,getDoc,getDocs,onSnapshot,query,where,deleteDoc,serverTimestamp}from"https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 const db=getFirestore(initializeApp({apiKey:"AIzaSyBUznSgupUAd2Aqg8F7fwCL61uUHPv9r_o",authDomain:"potosina-trade-mkt.firebaseapp.com",projectId:"potosina-trade-mkt",storageBucket:"potosina-trade-mkt.firebasestorage.app",messagingSenderId:"543238168455",appId:"1:543238168455:web:02cfea8e22d7ca75b53d22"}));
 const SCFG={'2025-11':{mes:'Noviembre 2025',sucursal:'Santa Cruz',objetivo:1813519,impuestos:0.406,acumulado:0},'2025-12':{mes:'Diciembre 2025',sucursal:'Santa Cruz',objetivo:2576833,impuestos:0.406,acumulado:0},'2026-01':{mes:'Enero 2026',sucursal:'Santa Cruz',objetivo:1700000,impuestos:0.406,acumulado:22703}};
 const SACTS=[
@@ -228,7 +232,8 @@ window.changeMonth=function(d){chM(gMK(d));};
 function uMD(){const n=gMN(CM);['month-display','month-display-2','month-display-3','month-display-4','month-display-5'].forEach(id=>{const e=document.getElementById(id);if(e)e.textContent=n;});['dash-month-label','acts-month-label','apro-month-label'].forEach(id=>{const e=document.getElementById(id);if(e)e.textContent=n;});}
 function uB(){const n=CA.filter(a=>a.estado==='Pendiente').length;const bp=document.getElementById('badge-pending'),ba=document.getElementById('badge-approval');if(bp){bp.textContent=n;bp.style.display=n?'inline-flex':'none';}if(ba)ba.textContent=n;}
 const gB=e=>{const m={'Pendiente':'badge-pending','Aprobada':'badge-approved','Rechazada':'badge-rejected','Ejecutada':'badge-executed'};const i={'Pendiente':'⏳','Aprobada':'✅','Rechazada':'✕','Ejecutada':'🚀'};return'<span class="badge '+(m[e]||'badge-pending')+'">'+(i[e]||'')+' '+e+'</span>';};
-function rDash(){const p=cPM(CC),n=cVN(CC),ap=CA.filter(a=>a.estado==='Aprobada'||a.estado==='Ejecutada'),pe=CA.filter(a=>a.estado==='Pendiente'),mA=ap.reduce((s,a)=>s+(a.monto||0),0),mP=pe.reduce((s,a)=>s+(a.monto||0),0);document.getElementById('dash-presupuesto').textContent=fBs(p);document.getElementById('dash-ventas-netas').textContent='Ventas netas: '+fBs(n);document.getElementById('dash-aprobado').textContent=fBs(mA);document.getElementById('dash-pct-aprobado').textContent=p>0?((mA/p)*100).toFixed(1)+'% del presupuesto':'';document.getElementById('dash-pendiente').textContent=fBs(mP);document.getElementById('dash-pct-pendiente').textContent=pe.length+' actividad(es)';document.getElementById('dash-total-acts').textContent=CA.length;document.getElementById('dash-acts-detail').textContent=ap.length+' aprobadas · '+CA.filter(a=>a.estado==='Rechazada').length+' rechazadas';const pct=p>0?Math.min((mA/p)*100,100):0,bar=document.getElementById('budget-bar');bar.style.width=pct+'%';bar.className='budget-bar-fill'+(pct>90?' danger':pct>75?' warning':'');document.getElementById('budget-pct-label').textContent=pct.toFixed(1)+'%';document.getElementById('dash-ejecutado-label').textContent=fBs(mA);document.getElementById('dash-presupuesto-label').textContent=fBs(p);const cn={};CA.forEach(a=>{cn[a.canal]=(cn[a.canal]||0)+(a.monto||0);});const sc=Object.entries(cn).sort((a,b)=>b[1]-a[1]),tot=Object.values(cn).reduce((s,v)=>s+v,0);const cols=['#1D5C3A','#C9A44F','#C0392B','#2980B9','#8E44AD','#27AE60','#D35400','#16A085'];document.getElementById('dash-canales').innerHTML=sc.length?sc.map(([c,m],i)=>'<div style="margin-bottom:12px"><div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:4px"><span style="font-weight:600">'+c+'</span><span style="color:var(--gray-600)">'+fBs(m)+'</span></div><div style="background:var(--gray-100);border-radius:6px;height:8px;overflow:hidden"><div style="width:'+(tot>0?(m/tot*100).toFixed(1):0)+'%;height:100%;background:'+cols[i%cols.length]+';border-radius:6px"></div></div></div>').join(''):'<div style="color:var(--gray-400);font-size:13px">Sin actividades este mes</div>';const rc=[...CA].reverse().slice(0,5);document.getElementById('dash-recent').innerHTML=rc.length?'<table style="width:100%">'+rc.map(a=>'<tr style="border-bottom:1px solid var(--gray-100)"><td style="padding:10px 14px"><div style="font-size:13px;font-weight:600">'+a.local+'</div><div style="font-size:11px;color:var(--gray-400)">'+a.actividad+'</div></td><td style="padding:10px 14px;text-align:right;white-space:nowrap"><div style="font-size:12px;font-weight:700;color:var(--green-dark)">Bs. '+(a.monto||0).toLocaleString('es-BO')+'</div>'+gB(a.estado)+'</td></tr>').join('')+'</table>':'<div style="padding:20px;text-align:center;color:var(--gray-400);font-size:13px">Sin actividades</div>';}
+function rDash(){const p=cPM(CC),n=cVN(CC),ap=CA.filter(a=>a.estado==='Aprobada'||a.estado==='Ejecutada'),pe=CA.filter(a=>a.estado==='Pendiente'),mA=ap.reduce((s,a)=>s+(a.monto||0),0),mP=pe.reduce((s,a)=>s+(a.monto||0),0);document.getElementById('dash-presupuesto').textContent=fBs(p);document.getElementById('dash-ventas-netas').textContent='Ventas netas: '+fBs(n);document.getElementById('dash-aprobado').textContent=fBs(mA);document.getElementById('dash-pct-aprobado').textContent=p>0?((mA/p)*100).toFixed(1)+'% del presupuesto':'';document.getElementById('dash-pendiente').textContent=fBs(mP);document.getElementById('dash-pct-pendiente').textContent=pe.length+' actividad(es)';document.getElementById('dash-total-acts').textContent=CA.length;document.getElementById('dash-acts-detail').textContent=ap.length+' aprobadas · '+CA.filter(a=>a.estado==='Rechazada').length+' rechazadas';const pct=p>0?Math.min((mA/p)*100,100):0,bar=document.getElementById('budget-bar');bar.style.width=pct+'%';bar.className='budget-bar-fill'+(pct>90?' danger':pct>75?' warning':'');document.getElementById('budget-pct-label').textContent=pct.toFixed(1)+'%';document.getElementById('dash-ejecutado-label').textContent=fBs(mA);document.getElementById('dash-presupuesto-label').textContent=fBs(p);const cn={};CA.forEach(a=>{cn[a.canal]=(cn[a.canal]||0)+(a.monto||0);});const sc=Object.entries(cn).sort((a,b)=>b[1]-a[1]),tot=Object.values(cn).reduce((s,v)=>s+v,0);const cols=['#1D5C3A','#C9A44F','#C0392B','#2980B9','#8E44AD','#27AE60','#D35400','#16A085'];document.getElementById('dash-canales').innerHTML=sc.length?sc.map(([c,m],i)=>'<div style="margin-bottom:12px"><div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:4px"><span style="font-weight:600">'+c+'</span><span style="color:var(--gray-600)">'+fBs(m)+'</span></div><div style="background:var(--gray-100);border-radius:6px;height:8px;overflow:hidden"><div style="width:'+(tot>0?(m/tot*100).toFixed(1):0)+'%;height:100%;background:'+cols[i%cols.length]+';border-radius:6px"></div></div></div>').join(''):'<div style="color:var(--gray-400);font-size:13px">Sin actividades este mes</div>';const rc=[...CA].reverse().slice(0,5);document.getElementById('dash-recent').innerHTML=rc.length?'<table style="width:100%">'+rc.map(a=>'<tr style="border-bottom:1px solid var(--gray-100)"><td style="padding:10px 14px"><div style="font-size:13px;font-weight:600">'+a.local+'</div><div style="font-size:11px;color:var(--gray-400)">'+a.actividad+'</div></td><td style="padding:10px 14px;text-align:right;white-space:nowrap"><div style="font-size:12px;font-weight:700;color:var(--green-dark)">Bs. '+(a.monto||0).toLocaleString('es-BO')+'</div>'+gB(a.estado)+'</td></tr>').join('')+'</table>':'<div style="padding:20px;text-align:center;color:var(--gray-400);font-size:13px">Sin actividades</div>';
+  renderTrendChart();}
 function rActs(){const s=document.getElementById('search-input')?.value.toLowerCase()||'',fc=document.getElementById('filter-canal')?.value||'',fe=document.getElementById('filter-estado')?.value||'';document.getElementById('btn-nueva-act').style.display=CU?.role==='trade'?'flex':'none';const f=CA.filter(a=>{const ms=!s||[a.local,a.actividad,a.marca,a.requerimiento].some(x=>(x||'').toLowerCase().includes(s));return ms&&(!fc||a.canal===fc)&&(!fe||a.estado===fe);});const tb=document.getElementById('tbody-actividades'),em=document.getElementById('empty-acts');if(!f.length){tb.innerHTML='';em.style.display='block';}else{em.style.display='none';tb.innerHTML=f.map((a,i)=>'<tr><td style="font-size:11px;color:var(--gray-400)">'+(i+1)+'</td><td>'+(a.fecha?a.fecha.substring(0,10):'—')+'</td><td><span style="font-size:11px;background:var(--gray-100);padding:2px 8px;border-radius:4px;font-weight:600;color:var(--gray-600)">'+a.canal+'</span></td><td class="td-main">'+a.local+'</td><td style="font-size:12px;color:var(--gray-600)">'+a.actividad+'</td><td style="font-size:12px">'+(a.marca||'—')+'</td><td><span class="monto-value">Bs. '+(a.monto||0).toLocaleString('es-BO')+'</span></td><td>'+gB(a.estado)+'</td><td class="td-actions"><div style="display:flex;gap:4px"><button class="btn-action btn-outline btn-sm" onclick="vD(\''+a.id+'\')">👁</button>'+(CU?.role==='trade'?'<button class="btn-action btn-outline btn-sm" onclick="eA(\''+a.id+'\')">✏️</button><button class="btn-action btn-sm" style="background:#FEE2E2;color:var(--red);border:none" onclick="dA(\''+a.id+'\')">🗑</button>':'')+'</div></td></tr>').join('');}const tot=f.reduce((s,a)=>s+(a.monto||0),0);document.getElementById('acts-total-label').textContent=f.length+' actividades';document.getElementById('acts-total-monto').textContent='Total: '+fBs(tot);}
 window.openModal=function(mode,id){EID=null;document.getElementById('modal-title').textContent=mode==='nueva'?'📋 Nueva Actividad':'✏️ Editar Actividad';['act-id','act-fecha','act-canal','act-local','act-actividad','act-marca','act-requerimiento','act-contrato','act-monto','act-pago','act-que-ofrecen','act-observaciones'].forEach(fid=>{const e=document.getElementById(fid);if(e)e.value='';});const estadoGroup=document.getElementById('act-estado-group');if(mode==='edit'&&id){const a=CA.find(x=>x.id===id);if(!a)return;EID=id;document.getElementById('act-id').value=id;document.getElementById('act-fecha').value=a.fecha?a.fecha.substring(0,10):'';document.getElementById('act-canal').value=a.canal;document.getElementById('act-local').value=a.local;document.getElementById('act-actividad').value=a.actividad;document.getElementById('act-marca').value=a.marca||'';document.getElementById('act-requerimiento').value=a.requerimiento||'';document.getElementById('act-contrato').value=a.contrato||'1 día';document.getElementById('act-monto').value=a.monto||'';document.getElementById('act-pago').value=a.pago||'Efectivo';document.getElementById('act-que-ofrecen').value=a.queOfrecen||'';document.getElementById('act-observaciones').value=a.observaciones||'';document.getElementById('act-estado').value=a.estado||'Pendiente';if(estadoGroup)estadoGroup.style.display='block';}else{document.getElementById('act-fecha').value=new Date().toISOString().substring(0,10);if(estadoGroup)estadoGroup.style.display='none';}document.getElementById('modal-actividad').classList.add('open');};
 window.closeModal=id=>document.getElementById(id).classList.remove('open');
@@ -246,6 +251,136 @@ window.saveConfigFn=async function(){const c={mes:gMN(CM),sucursal:document.getE
 function rRep(){const c=CC,p=cPM(c),n=cVN(c),mA=CA.filter(a=>a.estado==='Aprobada'||a.estado==='Ejecutada').reduce((s,a)=>s+(a.monto||0),0);const ap=CA.filter(a=>a.estado==='Aprobada'||a.estado==='Ejecutada'),re=CA.filter(a=>a.estado==='Rechazada'),pe=CA.filter(a=>a.estado==='Pendiente');document.getElementById('reporte-content').innerHTML='<div class="card" style="margin-bottom:20px"><div style="background:linear-gradient(135deg,var(--green-dark),var(--green-mid));padding:24px 28px;border-radius:var(--radius) var(--radius) 0 0;color:white"><div style="display:flex;justify-content:space-between;align-items:flex-start"><div><div style="font-family:\'Playfair Display\',serif;font-size:22px;font-weight:700">COMITÉ DE MARKETING</div><div style="font-size:16px;color:var(--gold-light);margin-top:4px">'+gMN(CM).toUpperCase()+'</div></div><div style="text-align:right"><div style="font-size:12px;opacity:0.7">Sucursal</div><div style="font-size:16px;font-weight:700">'+(c.sucursal||'Santa Cruz')+'</div></div></div></div><div class="card-body"><div style="display:grid;grid-template-columns:repeat(3,1fr);gap:16px"><div style="background:var(--off-white);border-radius:8px;padding:14px"><div style="font-size:11px;text-transform:uppercase;letter-spacing:1px;color:var(--gray-400);margin-bottom:4px">Objetivo de Venta</div><div style="font-size:16px;font-weight:700;font-family:\'Playfair Display\',serif">'+fBs(c.objetivo)+'</div></div><div style="background:var(--off-white);border-radius:8px;padding:14px"><div style="font-size:11px;text-transform:uppercase;letter-spacing:1px;color:var(--gray-400);margin-bottom:4px">Ventas Netas (sin imp.)</div><div style="font-size:16px;font-weight:700;font-family:\'Playfair Display\',serif">'+fBs(n)+'</div></div><div style="background:rgba(201,164,79,0.1);border:1px solid rgba(201,164,79,0.3);border-radius:8px;padding:14px"><div style="font-size:11px;text-transform:uppercase;letter-spacing:1px;color:var(--gold);margin-bottom:4px">Presupuesto MKT (2%)</div><div style="font-size:20px;font-weight:700;font-family:\'Playfair Display\',serif;color:var(--gold)">'+fBs(p)+'</div></div></div></div></div><div class="table-wrapper" style="margin-bottom:20px"><table><thead><tr><th>#</th><th>Fecha</th><th>Canal</th><th>Local</th><th>Actividad</th><th>Requerimiento</th><th>Contrato</th><th>Monto Bs.</th><th>F.Pago</th><th>Marca</th><th>Estado</th></tr></thead><tbody>'+CA.map((a,i)=>'<tr><td>'+(i+1)+'</td><td>'+(a.fecha||'—')+'</td><td style="font-size:11px">'+a.canal+'</td><td class="td-main">'+a.local+'</td><td style="font-size:12px">'+a.actividad+'</td><td style="font-size:12px;max-width:200px">'+(a.requerimiento||'—')+'</td><td style="font-size:12px">'+a.contrato+'</td><td><strong>Bs. '+(a.monto||0).toLocaleString('es-BO')+'</strong></td><td style="font-size:12px">'+a.pago+'</td><td style="font-size:11px">'+(a.marca||'—')+'</td><td>'+gB(a.estado)+'</td></tr>').join('')+'<tr class="total-row"><td colspan="7" style="text-align:right">TOTAL: '+CA.length+' actividades</td><td><strong>Bs. '+mA.toLocaleString('es-BO')+'</strong></td><td colspan="3"></td></tr></tbody></table></div><div class="card"><div class="card-header"><span class="card-title">Resumen Ejecutivo</span></div><div class="card-body"><div style="display:grid;grid-template-columns:repeat(4,1fr);gap:16px"><div style="text-align:center;padding:16px;background:var(--off-white);border-radius:8px"><div style="font-size:28px;font-weight:700;font-family:\'Playfair Display\',serif;color:var(--green-dark)">'+CA.length+'</div><div style="font-size:11px;text-transform:uppercase;letter-spacing:1px;color:var(--gray-400);margin-top:4px">Total Actividades</div></div><div style="text-align:center;padding:16px;background:#D1FAE5;border-radius:8px"><div style="font-size:28px;font-weight:700;font-family:\'Playfair Display\',serif;color:#065F46">'+ap.length+'</div><div style="font-size:11px;text-transform:uppercase;letter-spacing:1px;color:#065F46;margin-top:4px">Aprobadas</div></div><div style="text-align:center;padding:16px;background:#FEE2E2;border-radius:8px"><div style="font-size:28px;font-weight:700;font-family:\'Playfair Display\',serif;color:var(--red)">'+re.length+'</div><div style="font-size:11px;text-transform:uppercase;letter-spacing:1px;color:var(--red);margin-top:4px">Rechazadas</div></div><div style="text-align:center;padding:16px;background:#FFF3CD;border-radius:8px"><div style="font-size:28px;font-weight:700;font-family:\'Playfair Display\',serif;color:#856404">'+pe.length+'</div><div style="font-size:11px;text-transform:uppercase;letter-spacing:1px;color:#856404;margin-top:4px">Pendientes</div></div></div><div style="margin-top:16px;padding:16px;background:var(--off-white);border-radius:8px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px"><span style="font-size:13px;color:var(--gray-600)">Monto Aprobado: <strong style="color:var(--green-dark);font-size:16px">'+fBs(mA)+'</strong></span><span style="font-size:13px;color:var(--gray-600)">Disponible: <strong style="color:'+(p-mA<0?'var(--red)':'var(--green-dark)')+';font-size:16px">'+fBs(p-mA)+'</strong></span><span style="font-size:13px;color:var(--gray-600)">Ejecución: <strong style="color:var(--gold);font-size:16px">'+(p>0?((mA/p)*100).toFixed(1):0)+'%</strong></span></div></div></div>';}
 function toast(type,msg){const c=document.getElementById('toast-container'),t=document.createElement('div');t.className='toast '+type;t.textContent=msg;c.appendChild(t);setTimeout(()=>{t.style.transition='all .3s';t.style.opacity='0';t.style.transform='translateX(20px)';setTimeout(()=>t.remove(),300);},3000);}
 window.renderActividades=rActs;
+
+// ── TREND CHART ──
+let trendChartInstance=null;
+async function renderTrendChart(){
+  const months=['2025-09','2025-10','2025-11','2025-12','2026-01','2026-02','2026-03','2026-04','2026-05','2026-06','2026-07','2026-08'];
+  const p=CM.split('-');const ci=months.indexOf(CM);
+  const range=months.slice(Math.max(0,ci-2),ci+1);
+  const labels=[],presData=[],apData=[],pendData=[];
+  for(const m of range){
+    const [aSnap,cSnap]=await Promise.all([
+      getDocs(query(collection(db,'actividades'),where('mes','==',m))),
+      getDoc(doc(db,'configuracion',m))
+    ]);
+    const acts=[];aSnap.forEach(d=>acts.push(d.data()));
+    const cfg=cSnap.exists()?cSnap.data():{};
+    const pres=!cfg.objetivo?0:Math.min(cfg.objetivo*(1-(cfg.impuestos||0.406))*0.02+(cfg.acumulado||0),40000);
+    const aprobado=acts.filter(a=>a.estado==='Aprobada'||a.estado==='Ejecutada').reduce((s,a)=>s+(a.monto||0),0);
+    const pendiente=acts.filter(a=>a.estado==='Pendiente').reduce((s,a)=>s+(a.monto||0),0);
+    labels.push(gMN(m));
+    presData.push(Math.round(pres));
+    apData.push(Math.round(aprobado));
+    pendData.push(Math.round(pendiente));
+  }
+  const canvas=document.getElementById('trend-chart');if(!canvas)return;
+  if(trendChartInstance){trendChartInstance.destroy();trendChartInstance=null;}
+  trendChartInstance=new Chart(canvas,{
+    type:'bar',
+    data:{
+      labels,
+      datasets:[
+        {label:'Presupuesto Total',data:presData,backgroundColor:'rgba(201,164,79,0.2)',borderColor:'#C9A44F',borderWidth:2,type:'line',tension:0.4,pointBackgroundColor:'#C9A44F',pointRadius:5,fill:false,order:0},
+        {label:'Monto Aprobado',data:apData,backgroundColor:'rgba(29,92,58,0.75)',borderColor:'#1D5C3A',borderWidth:1,borderRadius:6,order:1},
+        {label:'Monto Pendiente',data:pendData,backgroundColor:'rgba(192,57,43,0.6)',borderColor:'#C0392B',borderWidth:1,borderRadius:6,order:2}
+      ]
+    },
+    options:{
+      responsive:true,
+      plugins:{
+        legend:{position:'top',labels:{font:{family:'Nunito',size:12},usePointStyle:true,padding:16}},
+        tooltip:{callbacks:{label:ctx=>' Bs. '+ctx.raw.toLocaleString('es-BO')}}
+      },
+      scales:{
+        y:{ticks:{callback:v=>'Bs. '+Math.round(v).toLocaleString('es-BO'),font:{size:11}},grid:{color:'rgba(0,0,0,0.05)'}},
+        x:{grid:{display:false},ticks:{font:{size:12}}}
+      }
+    }
+  });
+}
+
+// ── PDF EXPORT ──
+window.exportPDF=async function(){
+  const{jsPDF}=window.jspdf;
+  const doc=new jsPDF({orientation:'landscape',unit:'mm',format:'a4'});
+  const mes=gMN(CM),c=CC,p=cPM(c),n=cVN(c);
+  const mA=CA.filter(a=>a.estado==='Aprobada'||a.estado==='Ejecutada').reduce((s,a)=>s+(a.monto||0),0);
+  const ap=CA.filter(a=>a.estado==='Aprobada'||a.estado==='Ejecutada').length;
+  const re=CA.filter(a=>a.estado==='Rechazada').length;
+  const pe=CA.filter(a=>a.estado==='Pendiente').length;
+  const W=doc.internal.pageSize.getWidth(),H=doc.internal.pageSize.getHeight();
+
+  // Header band
+  doc.setFillColor(27,58,47);doc.rect(0,0,W,22,'F');
+  doc.setFillColor(201,164,79);doc.rect(0,22,W,1.5,'F');
+  doc.setTextColor(255,255,255);
+  doc.setFont('helvetica','bold');doc.setFontSize(16);
+  doc.text('COMITÉ DE TRADE MARKETING — CERVECERÍA NACIONAL POTOSINA',14,10);
+  doc.setFontSize(11);doc.setFont('helvetica','normal');
+  doc.text(mes.toUpperCase()+'   |   Regional: '+(c.sucursal||'Santa Cruz'),14,17);
+  doc.text('Generado: '+new Date().toLocaleDateString('es-BO',{day:'2-digit',month:'long',year:'numeric'}),W-14,17,{align:'right'});
+
+  // KPI boxes
+  const kpis=[
+    {label:'Presupuesto Total',val:fBs(p),color:[201,164,79]},
+    {label:'Monto Aprobado',val:fBs(mA),color:[29,92,58]},
+    {label:'Disponible',val:fBs(p-mA),color:[p-mA<0?192:29,p-mA<0?57:92,p-mA<0?43:58]},
+    {label:'Ejecución',val:(p>0?((mA/p)*100).toFixed(1):0)+'%',color:[201,164,79]}
+  ];
+  kpis.forEach((k,i)=>{
+    const x=14+i*68,y=27;
+    doc.setFillColor(...k.color);doc.roundedRect(x,y,64,16,2,2,'F');
+    doc.setTextColor(255,255,255);doc.setFont('helvetica','bold');doc.setFontSize(13);
+    doc.text(k.val,x+32,y+7,{align:'center'});
+    doc.setFontSize(7);doc.setFont('helvetica','normal');
+    doc.text(k.label.toUpperCase(),x+32,y+12,{align:'center'});
+  });
+
+  // Table
+  const rows=CA.map((a,i)=>[
+    i+1,
+    a.fecha?a.fecha.substring(0,10):'—',
+    a.canal,
+    a.local.substring(0,30)+(a.local.length>30?'…':''),
+    a.actividad.substring(0,28)+(a.actividad.length>28?'…':''),
+    'Bs. '+(a.monto||0).toLocaleString('es-BO'),
+    a.estado
+  ]);
+
+  doc.autoTable({
+    startY:47,
+    head:[['#','Fecha','Canal','Local / PDV','Actividad','Monto Bs.','Estado']],
+    body:rows,
+    styles:{fontSize:8,cellPadding:2.5,font:'helvetica'},
+    headStyles:{fillColor:[27,58,47],textColor:255,fontStyle:'bold',fontSize:8},
+    alternateRowStyles:{fillColor:[247,245,240]},
+    columnStyles:{0:{cellWidth:8},1:{cellWidth:22},2:{cellWidth:32},3:{cellWidth:52},4:{cellWidth:52},5:{cellWidth:22},6:{cellWidth:20}},
+    didParseCell:function(d){
+      if(d.section==='body'&&d.column.index===6){
+        const s=d.cell.raw;
+        if(s==='Aprobada')d.cell.styles.textColor=[6,95,70];
+        else if(s==='Rechazada')d.cell.styles.textColor=[153,27,27];
+        else if(s==='Ejecutada')d.cell.styles.textColor=[30,64,175];
+        else d.cell.styles.textColor=[133,100,4];
+        d.cell.styles.fontStyle='bold';
+      }
+    }
+  });
+
+  // Summary footer
+  const fy=doc.lastAutoTable.finalY+6;
+  doc.setFillColor(240,237,232);doc.roundedRect(14,fy,W-28,14,2,2,'F');
+  doc.setFont('helvetica','bold');doc.setFontSize(8);doc.setTextColor(44,42,39);
+  doc.text('RESUMEN:',18,fy+5);
+  doc.setFont('helvetica','normal');
+  doc.text(CA.length+' actividades totales   |   '+ap+' Aprobadas   |   '+re+' Rechazadas   |   '+pe+' Pendientes',40,fy+5);
+  doc.setFont('helvetica','bold');doc.setTextColor(27,58,47);
+  doc.text('Monto aprobado: '+fBs(mA)+'   |   Disponible: '+fBs(p-mA)+'   |   Ejecución: '+(p>0?((mA/p)*100).toFixed(1):0)+'%',18,fy+11);
+
+  doc.save('ComiteMKT_Potosina_'+CM+'.pdf');
+  toast('success','📄 PDF exportado correctamente');
+};
 window.addEventListener('load',async()=>{try{await seedIfEmpty();await new Promise(r=>setTimeout(r,500));}catch(e){console.warn('Seed:',e);}document.getElementById('loading-screen').style.display='none';document.getElementById('login-screen').classList.add('visible');document.getElementById('login-user').value='trade';window.selectRole('trade');});
 </script>
 </body>
